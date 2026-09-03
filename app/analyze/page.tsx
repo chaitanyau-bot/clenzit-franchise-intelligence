@@ -47,7 +47,8 @@ type AudienceSignal = {
   name: string;
   status: "live" | "needs_configuration" | "error";
   source: string;
-  estimate?: number;
+  estimateLowerBound?: number;
+  estimateUpperBound?: number;
   detail?: string;
   updatedAt?: string;
 };
@@ -1815,7 +1816,10 @@ function AnalyzeContent() {
 
             {(audienceData?.signals || TARGETING_SIGNAL_DEFINITIONS).map(
               (signal) => {
-                const live = signal.status === "live" && typeof signal.estimate === "number";
+                const live =
+                  signal.status === "live" &&
+                  typeof signal.estimateLowerBound === "number" &&
+                  typeof signal.estimateUpperBound === "number";
                 const context = analysis.targetingContext[signal.key] || "Google Places live local context is unavailable for this signal.";
 
                 return (
@@ -1833,7 +1837,7 @@ function AnalyzeContent() {
                     </span>
                     <p className="mt-1 text-xs leading-5 text-slate-500">
                       {live
-                        ? "Live audience estimate for the selected catchment"
+                        ? "Live monthly audience estimate for the selected catchment"
                         : signal.detail || "Direct audience data requires Meta Marketing API configuration."}
                     </p>
                     </div>
@@ -1853,7 +1857,10 @@ function AnalyzeContent() {
                   <div className="mt-4 border-t border-slate-100 pt-3">
                     {live ? (
                       <p className="text-lg font-black text-[#10264b]">
-                        {formatAudienceEstimate(signal.estimate!)}
+                        {formatAudienceEstimate(
+                          signal.estimateLowerBound!,
+                          signal.estimateUpperBound!
+                        )}
                       </p>
                     ) : (
                       <p className="text-sm font-semibold text-slate-700">
@@ -2457,9 +2464,14 @@ function formatCompact(
 }
 
 function formatAudienceEstimate(
-  value: number
+  lowerBound: number,
+  upperBound: number
 ) {
-  return `~${formatNumber(value)} people`;
+  if (lowerBound === upperBound) {
+    return `~${formatNumber(lowerBound)} people`;
+  }
+
+  return `${formatNumber(lowerBound)}–${formatNumber(upperBound)} people`;
 }
 
 function formatPlus(

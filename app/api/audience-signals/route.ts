@@ -61,9 +61,21 @@ function readAudienceEstimate(payload: unknown) {
 
   if (!first || typeof first !== "object") return null;
 
-  const estimate = first.estimate_dau ?? first.estimate_mau ?? first.users;
-  return typeof estimate === "number" && Number.isFinite(estimate)
-    ? estimate
+  const lowerBound = first.estimate_mau_lower_bound;
+  const upperBound = first.estimate_mau_upper_bound;
+
+  if (
+    typeof lowerBound === "number" &&
+    Number.isFinite(lowerBound) &&
+    typeof upperBound === "number" &&
+    Number.isFinite(upperBound)
+  ) {
+    return { lowerBound, upperBound };
+  }
+
+  const estimate = first.estimate_mau ?? first.users ?? first.estimate_dau;
+  return typeof estimate === "number" && Number.isFinite(estimate) && estimate > 0
+    ? { lowerBound: estimate, upperBound: estimate }
     : null;
 }
 
@@ -171,8 +183,9 @@ export async function GET(request: NextRequest) {
         return {
           ...signal,
           status: "live",
-          source: "Meta Marketing API · live audience estimate",
-          estimate,
+          source: "Meta Marketing API · monthly audience estimate",
+          estimateLowerBound: estimate.lowerBound,
+          estimateUpperBound: estimate.upperBound,
           updatedAt: new Date().toISOString(),
         };
       } catch {
