@@ -214,12 +214,6 @@ function AnalyzeContent() {
   const [locationLoading, setLocationLoading] =
     useState(true);
 
-  const [audienceData, setAudienceData] =
-    useState<AudienceSignalsResponse | null>(null);
-
-  const [audienceLoading, setAudienceLoading] =
-    useState(false);
-
   const [activeInsight, setActiveInsight] =
     useState<"overview" | "reviews" | "whitespace" | "brands">("overview");
 
@@ -526,57 +520,6 @@ function AnalyzeContent() {
     location,
     radiusKm,
   ]);
-
-  /* =======================================================
-     FETCH LIVE META AUDIENCE ESTIMATES
-
-     This route never fabricates an audience figure. When the
-     Meta credentials or approved targeting definitions are not
-     configured, it returns an explicit setup status instead.
-     ======================================================= */
-
-  useEffect(() => {
-    if (!coordinates) return;
-
-    const fetchAudienceSignals = async () => {
-      try {
-        setAudienceLoading(true);
-
-        const params = new URLSearchParams({
-          latitude: String(coordinates.latitude),
-          longitude: String(coordinates.longitude),
-          radiusKm: String(radiusKm),
-        });
-        const response = await fetch(
-          `/api/audience-signals?${params.toString()}`
-        );
-        const data = await response.json();
-
-        if (!response.ok || !data?.success) {
-          throw new Error(data?.error || "Audience data could not be loaded");
-        }
-
-        setAudienceData({
-          success: true,
-          mode: data.mode === "live" ? "live" : "needs_configuration",
-          signals: Array.isArray(data.signals) ? data.signals : [],
-          demographics: Array.isArray(data.demographics) ? data.demographics : [],
-        });
-      } catch (error) {
-        console.error("Audience signal error:", error);
-        setAudienceData({
-          success: true,
-          mode: "needs_configuration",
-          signals: [],
-          demographics: [],
-        });
-      } finally {
-        setAudienceLoading(false);
-      }
-    };
-
-    fetchAudienceSignals();
-  }, [coordinates, radiusKm]);
 
   /* =======================================================
      TERRITORY MODEL
@@ -1307,49 +1250,6 @@ function AnalyzeContent() {
 
           </div>
 
-          {audienceData?.demographics?.some(
-            (segment) => segment.status === "live"
-          ) && (
-            <div className="mt-8 border-t border-slate-100 pt-7">
-              <h4 className="text-base font-bold text-[#10264b]">
-                Location audience demographics
-              </h4>
-
-              <p className="mt-1 text-sm text-slate-500">
-                Live Meta monthly audience estimates by age band and gender for the selected catchment.
-              </p>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                {audienceData.demographics.map((segment) => {
-                  const live =
-                    segment.status === "live" &&
-                    typeof segment.estimateLowerBound === "number" &&
-                    typeof segment.estimateUpperBound === "number";
-
-                  return (
-                    <div
-                      key={`${segment.ageRange}-${segment.gender}`}
-                      className="rounded-xl border border-slate-200 bg-slate-50 p-3"
-                    >
-                      <p className="text-xs font-semibold text-slate-500">
-                        {segment.gender} · {segment.ageRange}
-                      </p>
-
-                      <p className="mt-1 text-sm font-black text-[#10264b]">
-                        {live
-                          ? formatAudienceEstimate(
-                              segment.estimateLowerBound!,
-                              segment.estimateUpperBound!
-                            )
-                          : "Unavailable"}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
         </section>
 
         {/* =================================================
@@ -1954,85 +1854,43 @@ function AnalyzeContent() {
         <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
 
           <SectionTitle
-            eyebrow="05 · DIGITAL MARKET ANALYSIS"
-            title="Targeting signals"
-            description="Meta audience estimates are shown only when a configured Meta Marketing API returns them for this location. Google Places context is live local-market information, not an audience estimate."
+            eyebrow="05 · LOCAL MARKET INTELLIGENCE"
+            title="Evidence-based opportunity signals"
+            description="A transparent view of local demand, competition and service gaps built from live Google Places data. No audience estimates or invented numbers."
           />
 
-          <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            {audienceLoading
-              ? "Checking live audience availability…"
-              : audienceData?.mode === "live"
-                ? "Live Meta audience estimates are available for the signals marked below."
-                : "Meta audience estimates are not configured. No audience sizes are shown; the supporting Google Places context remains live."}
+          <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+            Every signal below is tied to verified businesses, ratings, reviews or category counts in the selected catchment.
           </div>
 
           <div className="mt-7 grid gap-4 md:grid-cols-2">
-
-            {(audienceData?.signals || TARGETING_SIGNAL_DEFINITIONS).map(
-              (signal) => {
-                const live =
-                  signal.status === "live" &&
-                  typeof signal.estimateLowerBound === "number" &&
-                  typeof signal.estimateUpperBound === "number";
-                const context = analysis.targetingContext[signal.key] || "Google Places live local context is unavailable for this signal.";
-
-                return (
-
-                <div
-                  key={signal.key}
-                  className="rounded-xl border border-slate-200 p-4"
-                >
-
-                  <div className="flex items-start justify-between gap-4">
-
-                    <div>
-                    <span className="font-medium">
-                      {signal.name}
-                    </span>
+            {analysis.customerSignals.map((signal) => (
+              <div key={signal.name} className="rounded-xl border border-slate-200 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <span className="font-medium">{signal.name}</span>
                     <p className="mt-1 text-xs leading-5 text-slate-500">
-                      {live
-                        ? "Live monthly audience estimate for the selected catchment"
-                        : signal.detail || "Direct audience data requires Meta Marketing API configuration."}
-                    </p>
-                    </div>
-
-                    <span className={
-                      `shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
-                        live
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-amber-50 text-amber-700"
-                      }`
-                    }>
-                      {live ? "LIVE META" : "META SETUP"}
-                    </span>
-
-                  </div>
-
-                  <div className="mt-4 border-t border-slate-100 pt-3">
-                    {live ? (
-                      <p className="text-lg font-black text-[#10264b]">
-                        {formatAudienceEstimate(
-                          signal.estimateLowerBound!,
-                          signal.estimateUpperBound!
-                        )}
-                      </p>
-                    ) : (
-                      <p className="text-sm font-semibold text-slate-700">
-                        Audience estimate unavailable
-                      </p>
-                    )}
-                    <p className="mt-2 text-xs leading-5 text-slate-500">
-                      {live ? signal.source : context}
+                      Composite local-market signal from Google Places evidence
                     </p>
                   </div>
-
+                  <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                    VERIFIED SIGNAL
+                  </span>
                 </div>
-
-                );
-              }
-            )}
-
+                <div className="mt-4 border-t border-slate-100 pt-3">
+                  <p className="text-lg font-black text-[#10264b]">{signal.score} / 100</p>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    {signal.name === "Shopping Intent"
+                      ? analysis.targetingContext.engagedShoppers
+                      : signal.name === "Premium Lifestyle"
+                        ? analysis.targetingContext.luxuryGoods
+                        : signal.name === "Fashion Potential"
+                          ? analysis.targetingContext.fashionApparel
+                          : analysis.targetingContext.businessOwners}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
 
         </section>
