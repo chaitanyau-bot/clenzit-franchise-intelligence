@@ -180,9 +180,31 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const apiVersion = process.env.META_API_VERSION || "v24.0";
+  // Accept the account ID in either Meta's displayed `act_123...` form or
+  // the numeric form.  Vercel and cPanel have historically used both forms,
+  // so adding `act_` unconditionally produced invalid `act_act_...` IDs.
+  const normalizedAdAccountId = adAccountId.trim().replace(/^act_/i, "");
+  const configuredApiVersion = (process.env.META_API_VERSION || "v24.0").trim();
+  const apiVersion = /^v\d+(?:\.\d+)?$/i.test(configuredApiVersion)
+    ? configuredApiVersion
+    : "v24.0";
+
+  if (
+    !/^\d+$/.test(normalizedAdAccountId) ||
+    normalizedAdAccountId.includes("META_API_VERSION")
+  ) {
+    return NextResponse.json({
+      success: true,
+      mode: "needs_configuration",
+      signals: unavailableSignals(
+        "The Meta ad account ID is invalid. Set META_AD_ACCOUNT_ID to the numeric account ID (with or without the act_ prefix).",
+        "needs_configuration"
+      ),
+    });
+  }
+
   const safeRadiusKm = Math.min(Math.max(radiusKm, 1), 80);
-  const endpoint = `https://graph.facebook.com/${apiVersion}/act_${adAccountId}/delivery_estimate`;
+  const endpoint = `https://graph.facebook.com/${apiVersion}/act_${normalizedAdAccountId}/delivery_estimate`;
 
   const geoLocations = {
     custom_locations: [
