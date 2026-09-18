@@ -252,7 +252,7 @@ export async function GET(request: NextRequest) {
                 const details = await detailsResponse.json();
                 if (detailsResponse.ok && Array.isArray(details.reviews)) {
                   business.reviewExcerpts = details.reviews
-                    .filter((review: any) => review?.text?.text)
+                    .filter((review: any) => review?.text?.text && typeof review.rating === "number" && review.rating <= 3)
                     .slice(0, 3)
                     .map((review: any) => ({
                       rating: review.rating ?? null,
