@@ -18,6 +18,36 @@ type SignalDefinition = {
 
 type MetaTargetingDefinitions = Partial<Record<SignalKey, Record<string, unknown>>>;
 
+type AudienceRange = {
+  lowerBound: number;
+  upperBound: number;
+};
+
+// These are stable Meta catalogue definitions used when a deployment's
+// configuration has not explicitly overridden them. They are intentionally
+// kept separate from credentials, which remain environment-only.
+const DEFAULT_TARGETING_DEFINITIONS: MetaTargetingDefinitions = {
+  engagedShoppers: {
+    behaviors: [{ id: "6071631541183", name: "Engaged shoppers" }],
+  },
+  businessOwners: {
+    behaviors: [{ id: "6002714898572", name: "Small business owners" }],
+  },
+};
+
+const DEMOGRAPHIC_SEGMENTS = [
+  { ageRange: "18–24", ageMin: 18, ageMax: 24 },
+  { ageRange: "25–34", ageMin: 25, ageMax: 34 },
+  { ageRange: "35–44", ageMin: 35, ageMax: 44 },
+  { ageRange: "45–54", ageMin: 45, ageMax: 54 },
+  { ageRange: "55+", ageMin: 55, ageMax: 65 },
+] as const;
+
+const GENDERS = [
+  { label: "Women", value: 2 },
+  { label: "Men", value: 1 },
+] as const;
+
 const SIGNALS: SignalDefinition[] = [
   { key: "engagedShoppers", name: "Engaged Shoppers" },
   { key: "luxuryGoods", name: "Luxury Goods" },
@@ -42,19 +72,22 @@ function unavailableSignals(detail: string, status: "needs_configuration" | "err
 function parseTargetingDefinitions(): MetaTargetingDefinitions | null {
   const raw = process.env.META_SIGNAL_TARGETING_JSON;
 
-  if (!raw) return null;
+  if (!raw) return DEFAULT_TARGETING_DEFINITIONS;
 
   try {
     const parsed: unknown = JSON.parse(raw);
     return parsed && typeof parsed === "object"
-      ? (parsed as MetaTargetingDefinitions)
+      ? {
+          ...DEFAULT_TARGETING_DEFINITIONS,
+          ...(parsed as MetaTargetingDefinitions),
+        }
       : null;
   } catch {
     return null;
   }
 }
 
-function readAudienceEstimate(payload: unknown) {
+function readAudienceEstimate(payload: unknown): AudienceRange | null {
   const first = Array.isArray((payload as { data?: unknown[] })?.data)
     ? (payload as { data: Array<Record<string, unknown>> }).data[0]
     : undefined;
@@ -77,6 +110,35 @@ function readAudienceEstimate(payload: unknown) {
   return typeof estimate === "number" && Number.isFinite(estimate) && estimate > 0
     ? { lowerBound: estimate, upperBound: estimate }
     : null;
+}
+
+async function getAudienceRange(
+  endpoint: string,
+  accessToken: string,
+  targetingSpec: Record<string, unknown>
+) {
+  const query = new URLSearchParams({
+    access_token: accessToken,
+    optimization_goal: "REACH",
+    targeting_spec: JSON.stringify(targetingSpec),
+  });
+  const response = await fetch(`${endpoint}?${query.toString()}`, {
+    cache: "no-store",
+  });
+  const payload = await response.json();
+
+  if (!response.ok) {
+    return {
+      error:
+        payload?.error?.message ||
+        "Meta could not return an audience estimate for this targeting definition.",
+    };
+  }
+
+  const estimate = readAudienceEstimate(payload);
+  return estimate
+    ? { estimate }
+    : { error: "Meta returned no usable monthly audience estimate for this targeting definition." };
 }
 
 export async function GET(request: NextRequest) {
@@ -122,6 +184,17 @@ export async function GET(request: NextRequest) {
   const safeRadiusKm = Math.min(Math.max(radiusKm, 1), 80);
   const endpoint = `https://graph.facebook.com/${apiVersion}/act_${adAccountId}/delivery_estimate`;
 
+  const geoLocations = {
+    custom_locations: [
+      {
+        latitude,
+        longitude,
+        radius: safeRadiusKm,
+        distance_unit: "kilometer",
+      },
+    ],
+  };
+
   const signals = await Promise.all(
     SIGNALS.map(async (signal) => {
       const configuredTargeting = targetingDefinitions[signal.key];
@@ -139,44 +212,23 @@ export async function GET(request: NextRequest) {
         ...configuredTargeting,
         geo_locations: {
           ...(configuredTargeting.geo_locations as Record<string, unknown> | undefined),
-          custom_locations: [
-            {
-              latitude,
-              longitude,
-              radius: safeRadiusKm,
-              distance_unit: "kilometer",
-            },
-          ],
+          ...geoLocations,
         },
       };
 
       try {
-        const query = new URLSearchParams({
-          access_token: accessToken,
-          optimization_goal: "REACH",
-          targeting_spec: JSON.stringify(targetingSpec),
-        });
-        const response = await fetch(`${endpoint}?${query.toString()}`, {
-          cache: "no-store",
-        });
-        const payload = await response.json();
+        const result = await getAudienceRange(
+          endpoint,
+          accessToken,
+          targetingSpec
+        );
 
-        if (!response.ok) {
+        if ("error" in result) {
           return {
             ...signal,
             status: "error",
             source: "Meta Marketing API",
-            detail: payload?.error?.message || "Meta could not return an audience estimate for this signal.",
-          };
-        }
-
-        const estimate = readAudienceEstimate(payload);
-        if (estimate === null) {
-          return {
-            ...signal,
-            status: "error",
-            source: "Meta Marketing API",
-            detail: "Meta returned no usable audience estimate for this targeting definition.",
+            detail: result.error,
           };
         }
 
@@ -184,8 +236,8 @@ export async function GET(request: NextRequest) {
           ...signal,
           status: "live",
           source: "Meta Marketing API · monthly audience estimate",
-          estimateLowerBound: estimate.lowerBound,
-          estimateUpperBound: estimate.upperBound,
+          estimateLowerBound: result.estimate.lowerBound,
+          estimateUpperBound: result.estimate.upperBound,
           updatedAt: new Date().toISOString(),
         };
       } catch {
@@ -199,9 +251,41 @@ export async function GET(request: NextRequest) {
     })
   );
 
+  const demographics = await Promise.all(
+    DEMOGRAPHIC_SEGMENTS.flatMap((segment) =>
+      GENDERS.map(async (gender) => {
+        const result = await getAudienceRange(endpoint, accessToken, {
+          age_min: segment.ageMin,
+          age_max: segment.ageMax,
+          genders: [gender.value],
+          geo_locations: geoLocations,
+        });
+
+        return "error" in result
+          ? {
+              ageRange: segment.ageRange,
+              gender: gender.label,
+              status: "error",
+              source: "Meta Marketing API",
+              detail: result.error,
+            }
+          : {
+              ageRange: segment.ageRange,
+              gender: gender.label,
+              status: "live",
+              source: "Meta Marketing API · monthly audience estimate",
+              estimateLowerBound: result.estimate.lowerBound,
+              estimateUpperBound: result.estimate.upperBound,
+              updatedAt: new Date().toISOString(),
+            };
+      })
+    )
+  );
+
   return NextResponse.json({
     success: true,
     mode: signals.some((signal) => signal.status === "live") ? "live" : "needs_configuration",
     signals,
+    demographics,
   });
 }

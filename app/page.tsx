@@ -17,6 +17,8 @@ const recentAreas = [
   },
 ];
 
+const CATCHMENT_RADII_KM = Array.from({ length: 15 }, (_, index) => index + 1);
+
 export default function Home() {
   const [location, setLocation] = useState("");
   const [radius, setRadius] = useState("15 km");
@@ -119,10 +121,9 @@ export default function Home() {
                 onChange={(e) => setRadius(e.target.value)}
                 className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-sm outline-none focus:border-[#c4912e]"
               >
-                <option>5 km</option>
-                <option>10 km</option>
-                <option>15 km</option>
-                <option>20 km</option>
+                {CATCHMENT_RADII_KM.map((kilometres) => (
+                  <option key={kilometres}>{kilometres} km</option>
+                ))}
               </select>
             </div>
 

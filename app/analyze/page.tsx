@@ -53,10 +53,21 @@ type AudienceSignal = {
   updatedAt?: string;
 };
 
+type AudienceDemographic = {
+  ageRange: string;
+  gender: string;
+  status: "live" | "error";
+  source: string;
+  estimateLowerBound?: number;
+  estimateUpperBound?: number;
+  detail?: string;
+};
+
 type AudienceSignalsResponse = {
   success: boolean;
   mode: "live" | "needs_configuration";
   signals: AudienceSignal[];
+  demographics: AudienceDemographic[];
 };
 
 type CityTier = "tier1" | "tier2" | "tier3";
@@ -203,6 +214,9 @@ function AnalyzeContent() {
   const [audienceLoading, setAudienceLoading] =
     useState(false);
 
+  const [activeInsight, setActiveInsight] =
+    useState<"overview" | "reviews" | "whitespace" | "brands">("overview");
+
   /* =======================================================
      READ URL PARAMETERS
      ======================================================= */
@@ -235,20 +249,26 @@ function AnalyzeContent() {
       Number.isFinite(parsedRadius) &&
       parsedRadius > 0
     ) {
-      setRadiusKm(parsedRadius);
+      setRadiusKm(Math.min(Math.max(parsedRadius, 1), 15));
     } else {
       setRadiusKm(5);
     }
 
+    // Number(null) evaluates to 0. Treat missing URL coordinates as missing so
+    // that the location is geocoded instead of silently querying Meta at 0,0.
     const parsedLatitude =
-      Number(latitudeParam);
+      latitudeParam === null ? Number.NaN : Number(latitudeParam);
 
     const parsedLongitude =
-      Number(longitudeParam);
+      longitudeParam === null ? Number.NaN : Number(longitudeParam);
 
     if (
       Number.isFinite(parsedLatitude) &&
-      Number.isFinite(parsedLongitude)
+      Number.isFinite(parsedLongitude) &&
+      parsedLatitude >= -90 &&
+      parsedLatitude <= 90 &&
+      parsedLongitude >= -180 &&
+      parsedLongitude <= 180
     ) {
       setCoordinates({
         latitude: parsedLatitude,
@@ -534,6 +554,7 @@ function AnalyzeContent() {
           success: true,
           mode: data.mode === "live" ? "live" : "needs_configuration",
           signals: Array.isArray(data.signals) ? data.signals : [],
+          demographics: Array.isArray(data.demographics) ? data.demographics : [],
         });
       } catch (error) {
         console.error("Audience signal error:", error);
@@ -541,6 +562,7 @@ function AnalyzeContent() {
           success: true,
           mode: "needs_configuration",
           signals: [],
+          demographics: [],
         });
       } finally {
         setAudienceLoading(false);
@@ -1279,6 +1301,123 @@ function AnalyzeContent() {
 
           </div>
 
+          {audienceData?.demographics?.some(
+            (segment) => segment.status === "live"
+          ) && (
+            <div className="mt-8 border-t border-slate-100 pt-7">
+              <h4 className="text-base font-bold text-[#10264b]">
+                Location audience demographics
+              </h4>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Live Meta monthly audience estimates by age band and gender for the selected catchment.
+              </p>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                {audienceData.demographics.map((segment) => {
+                  const live =
+                    segment.status === "live" &&
+                    typeof segment.estimateLowerBound === "number" &&
+                    typeof segment.estimateUpperBound === "number";
+
+                  return (
+                    <div
+                      key={`${segment.ageRange}-${segment.gender}`}
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                    >
+                      <p className="text-xs font-semibold text-slate-500">
+                        {segment.gender} · {segment.ageRange}
+                      </p>
+
+                      <p className="mt-1 text-sm font-black text-[#10264b]">
+                        {live
+                          ? formatAudienceEstimate(
+                              segment.estimateLowerBound!,
+                              segment.estimateUpperBound!
+                            )
+                          : "Unavailable"}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+        </section>
+
+        {/* =================================================
+            INNOVATION TABS
+            ================================================= */}
+
+        <section className="mb-6 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="flex flex-wrap gap-2">
+            {[
+              ["overview", "Overview"],
+              ["reviews", "Reviews & Opportunity"],
+              ["whitespace", "White-space Map"],
+              ["brands", "Brand Footprint"],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setActiveInsight(key as typeof activeInsight)}
+                className={`rounded-xl px-4 py-3 text-sm font-bold transition ${
+                  activeInsight === key
+                    ? "bg-[#10264b] text-white"
+                    : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {activeInsight === "reviews" && (
+            <div className="mt-3 rounded-xl bg-amber-50 p-5">
+              <h3 className="font-bold text-[#10264b]">Service gaps and review opportunity</h3>
+              <p className="mt-1 text-sm text-amber-900">
+                Google review text is not returned by the Places endpoint used here. The panel therefore uses verified rating and review-volume signals only; it never invents review comments.
+              </p>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                {((placesData?.categories || []).find((c) => c.key === "laundry")?.businesses || [])
+                  .filter((b) => typeof b.rating === "number" && b.rating < 4.5)
+                  .slice(0, 6)
+                  .map((b, i) => (
+                    <div key={`${b.name}-${i}`} className="rounded-lg border border-amber-200 bg-white p-3 text-sm">
+                      <p className="font-semibold text-[#10264b]">{b.name}</p>
+                      <p className="mt-1 text-amber-800">★ {Number(b.rating).toFixed(1)} · {(b.reviews || 0).toLocaleString()} reviews</p>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {activeInsight === "whitespace" && (
+            <div className="mt-3 rounded-xl bg-emerald-50 p-5">
+              <h3 className="font-bold text-[#10264b]">White-space opportunity</h3>
+              <p className="mt-1 text-sm text-emerald-900">
+                The map view highlights demand indicators against laundry competition inside the selected radius. It is an opportunity signal, not a territorial guarantee.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <InsightMetric label="Laundry competition" value={analysis.laundryIsCapped ? "20+" : String(analysis.laundry)} />
+                <InsightMetric label="Commercial activity" value={`${analysis.commercialActivity}/100`} />
+                <InsightMetric label="Digital opportunity" value={`${analysis.digitalAverage}/100`} />
+              </div>
+            </div>
+          )}
+
+          {activeInsight === "brands" && (
+            <div className="mt-3 rounded-xl bg-slate-50 p-5">
+              <h3 className="font-bold text-[#10264b]">Brand footprint in this catchment</h3>
+              <p className="mt-1 text-sm text-slate-600">Google Business Profiles identified for laundry and dry-cleaning searches. Counts are limited to verified returned profiles.</p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {((placesData?.categories || []).find((c) => c.key === "laundry")?.businesses || []).slice(0, 12).map((b, i) => (
+                  <div key={`${b.name}-${i}`} className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold text-[#10264b]">{b.name}</div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* =================================================
@@ -2425,6 +2564,15 @@ function CompetitionRow({
 /* =========================================================
    HELPERS
    ========================================================= */
+
+function InsightMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-emerald-200 bg-white p-3">
+      <p className="text-xs text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-black text-[#10264b]">{value}</p>
+    </div>
+  );
+}
 
 function clamp(
   value: number,
