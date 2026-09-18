@@ -1387,7 +1387,11 @@ function AnalyzeContent() {
               </p>
               <div className="mt-4 grid gap-3 md:grid-cols-3">
                 {((placesData?.categories || []).find((c) => c.key === "laundry")?.businesses || [])
-                  .filter((b) => typeof b.rating === "number" && b.rating < 4.5)
+                  .filter((b) =>
+                    typeof b.rating === "number" &&
+                    b.rating < 4.5 &&
+                    (b.reviewExcerpts?.length || 0) > 0
+                  )
                   .slice(0, 6)
                   .map((b, i) => (
                     <div key={`${b.name}-${i}`} className="rounded-lg border border-amber-200 bg-white p-3 text-sm">
