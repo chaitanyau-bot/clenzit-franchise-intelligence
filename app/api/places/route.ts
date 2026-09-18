@@ -227,6 +227,47 @@ export async function GET(request: NextRequest) {
           })
         );
 
+        // Fetch a small, low-rating sample of review excerpts only for laundry
+        // profiles. Search results do not include review text; Place Details
+        // does, and limiting this to six profiles keeps usage predictable.
+        if (category.key === "laundry") {
+          const reviewCandidates = businesses
+            .filter((business: any) => business.id && typeof business.rating === "number" && business.rating < 4.5)
+            .sort((a: any, b: any) => (a.rating ?? 5) - (b.rating ?? 5))
+            .slice(0, 6);
+
+          await Promise.all(
+            reviewCandidates.map(async (business: any) => {
+              try {
+                const detailsResponse = await fetch(
+                  `https://places.googleapis.com/v1/places/${encodeURIComponent(business.id)}`,
+                  {
+                    headers: {
+                      "X-Goog-Api-Key": apiKey,
+                      "X-Goog-FieldMask": "reviews",
+                    },
+                    cache: "no-store",
+                  }
+                );
+                const details = await detailsResponse.json();
+                if (detailsResponse.ok && Array.isArray(details.reviews)) {
+                  business.reviewExcerpts = details.reviews
+                    .filter((review: any) => review?.text?.text)
+                    .slice(0, 3)
+                    .map((review: any) => ({
+                      rating: review.rating ?? null,
+                      text: review.text.text,
+                      publishTime: review.publishTime ?? null,
+                      author: review.authorAttribution?.displayName ?? null,
+                    }));
+                }
+              } catch {
+                // Review excerpts are supplementary; keep the profile usable.
+              }
+            })
+          );
+        }
+
         return {
           key: category.key,
           label: category.label,

@@ -18,6 +18,12 @@ type Business = {
   reviews?: number;
   businessStatus?: string | null;
   website?: string | null;
+  reviewExcerpts?: Array<{
+    rating?: number | null;
+    text: string;
+    publishTime?: string | null;
+    author?: string | null;
+  }>;
 };
 
 type PlaceCategory = {
@@ -1377,7 +1383,7 @@ function AnalyzeContent() {
             <div className="mt-3 rounded-xl bg-amber-50 p-5">
               <h3 className="font-bold text-[#10264b]">Service gaps and review opportunity</h3>
               <p className="mt-1 text-sm text-amber-900">
-                Google review text is not returned by the Places endpoint used here. The panel therefore uses verified rating and review-volume signals only; it never invents review comments.
+                Google review excerpts are loaded from Place Details for the lowest-rated profiles. The panel only shows text returned by Google; it never invents review comments.
               </p>
               <div className="mt-4 grid gap-3 md:grid-cols-3">
                 {((placesData?.categories || []).find((c) => c.key === "laundry")?.businesses || [])
@@ -1387,6 +1393,12 @@ function AnalyzeContent() {
                     <div key={`${b.name}-${i}`} className="rounded-lg border border-amber-200 bg-white p-3 text-sm">
                       <p className="font-semibold text-[#10264b]">{b.name}</p>
                       <p className="mt-1 text-amber-800">★ {Number(b.rating).toFixed(1)} · {(b.reviews || 0).toLocaleString()} reviews</p>
+                      {b.reviewExcerpts?.slice(0, 2).map((review, reviewIndex) => (
+                        <blockquote key={`${b.name}-review-${reviewIndex}`} className="mt-3 border-l-2 border-amber-300 pl-3 text-slate-600">
+                          “{review.text}”
+                          {review.author ? <cite className="mt-1 block text-xs not-italic text-slate-400">— {review.author}</cite> : null}
+                        </blockquote>
+                      ))}
                     </div>
                   ))}
               </div>
