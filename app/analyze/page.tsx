@@ -43,6 +43,15 @@ type PlacesResponse = {
   categories: PlaceCategory[];
 };
 
+type BrandPresenceResponse = {
+  success: boolean;
+  brand: string;
+  location: string;
+  radius: number;
+  count: number;
+  places: Array<Pick<Business, "id" | "name" | "address" | "rating" | "reviews" | "businessStatus" | "website"> & { mapsUrl?: string | null }>;
+};
+
 type Coordinates = {
   latitude: number;
   longitude: number;
@@ -211,11 +220,35 @@ function AnalyzeContent() {
   const [placesError, setPlacesError] =
     useState<string | null>(null);
 
+  const [brandName, setBrandName] = useState("");
+  const [brandPresence, setBrandPresence] = useState<BrandPresenceResponse | null>(null);
+  const [brandLoading, setBrandLoading] = useState(false);
+  const [brandError, setBrandError] = useState<string | null>(null);
+
   const [locationLoading, setLocationLoading] =
     useState(true);
 
   const [activeInsight, setActiveInsight] =
     useState<"overview" | "reviews" | "whitespace" | "brands">("overview");
+
+  const searchBrandPresence = async () => {
+    if (!brandName.trim() || !coordinates) return;
+    setBrandLoading(true);
+    setBrandError(null);
+    try {
+      const params = new URLSearchParams({
+        brand: brandName.trim(), location,
+        latitude: String(coordinates.latitude), longitude: String(coordinates.longitude),
+        radius: String(radiusKm * 1000),
+      });
+      const response = await fetch(`/api/brand-presence?${params}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "Unable to search Google Business Profiles");
+      setBrandPresence(data);
+    } catch (error) {
+      setBrandError(error instanceof Error ? error.message : "Unable to search Google Business Profiles");
+    } finally { setBrandLoading(false); }
+  };
 
   /* =======================================================
      READ URL PARAMETERS
@@ -1325,8 +1358,14 @@ function AnalyzeContent() {
 
           {activeInsight === "brands" && (
             <div className="mt-3 rounded-xl bg-slate-50 p-5">
-              <h3 className="font-bold text-[#10264b]">Brand footprint in this catchment</h3>
-              <p className="mt-1 text-sm text-slate-600">Google Business Profiles identified for laundry and dry-cleaning searches. Counts are limited to verified returned profiles.</p>
+              <h3 className="font-bold text-[#10264b]">Competitive brand presence</h3>
+              <p className="mt-1 text-sm text-slate-600">Search a brand to compare its claimed presence with Google Business Profiles found in this catchment. Results are Google-returned listings, not a guarantee of every physical store.</p>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <input value={brandName} onChange={(event) => setBrandName(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") searchBrandPresence(); }} placeholder="e.g. Tumbledry, UClean, Raymond" className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#10264b]" />
+                <button type="button" onClick={searchBrandPresence} disabled={brandLoading || !coordinates || !brandName.trim()} className="rounded-lg bg-[#10264b] px-4 py-2 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{brandLoading ? "Searching…" : "Check local presence"}</button>
+              </div>
+              {brandError && <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{brandError}</p>}
+              {brandPresence && <div className="mt-4 rounded-lg border border-[#e4c477] bg-[#fff9e9] p-4"><div className="flex flex-wrap items-end justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-wide text-[#a97918]">Google Business Profiles found</p><p className="mt-1 text-3xl font-bold text-[#10264b]">{brandPresence.count}</p></div><p className="text-sm text-slate-600">within {radiusKm} km of {formatLocation(location)}</p></div><div className="mt-4 grid gap-3 md:grid-cols-2">{brandPresence.places.map((place) => <div key={place.id || `${place.name}-${place.address}`} className="rounded-lg border border-slate-200 bg-white p-3 text-sm"><p className="font-bold text-[#10264b]">{place.name}</p><p className="mt-1 text-slate-600">{place.address}</p><p className="mt-1 text-amber-700">{place.rating ? `★ ${place.rating.toFixed(1)}` : "No rating"} · {place.reviews?.toLocaleString() || 0} reviews</p>{place.mapsUrl && <a href={place.mapsUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block font-semibold text-[#10264b] underline">Open in Google Maps</a>}</div>)}</div>{brandPresence.count === 0 && <p className="mt-3 text-sm text-slate-600">No matching Google Business Profiles were returned for this area.</p>}</div>}
               <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {((placesData?.categories || []).find((c) => c.key === "laundry")?.businesses || []).slice(0, 12).map((b, i) => (
                   <div key={`${b.name}-${i}`} className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-semibold text-[#10264b]">{b.name}</div>
