@@ -47,6 +47,8 @@ export async function GET(request: NextRequest) {
     id: place.id || null,
     name: place.displayName?.text || "Unknown",
     address: place.formattedAddress || "",
+    latitude: place.location?.latitude ?? null,
+    longitude: place.location?.longitude ?? null,
     rating: place.rating ?? null,
     reviews: place.userRatingCount ?? 0,
     businessStatus: place.businessStatus || null,
