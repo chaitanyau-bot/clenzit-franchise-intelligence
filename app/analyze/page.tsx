@@ -1762,7 +1762,7 @@ function AnalyzeContent() {
             return apartments.length > 0 ? (
               <div className="mt-8 rounded-xl border border-[#e4c477] bg-[#fff9e9] p-5">
                 <h3 className="text-lg font-bold text-[#10264b]">Apartments & large housing societies</h3>
-                <p className="mt-1 text-sm text-slate-600">Google-listed residential communities in the selected catchment, sorted as practical outreach prospects.</p>
+                <p className="mt-1 text-sm text-slate-600">Google-listed residential communities in the selected catchment, sorted as practical outreach prospects. Flat counts are shown only when verified; Google does not publish unit counts for most listings.</p>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   {apartments.slice(0, 10).map((business, index) => {
                     const distance = distanceKm(business.latitude, business.longitude);
@@ -1771,6 +1771,7 @@ function AnalyzeContent() {
                       <p className="mt-1 text-slate-600">{business.address}</p>
                       <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
                         {distance != null && <span className="font-semibold text-[#10264b]">{distance.toFixed(1)} km from selected location</span>}
+                        <span>Approx. flats/units: <span className="font-semibold text-slate-700">Not published</span></span>
                         {business.rating != null && <span>★ {business.rating.toFixed(1)} · {(business.reviews || 0).toLocaleString()} reviews</span>}
                       </div>
                     </div>;
