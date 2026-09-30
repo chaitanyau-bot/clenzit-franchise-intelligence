@@ -230,7 +230,7 @@ function AnalyzeContent() {
     useState(true);
 
   const [activeInsight, setActiveInsight] =
-    useState<"overview" | "reviews" | "whitespace" | "brands">("overview");
+    useState<"overview" | "test" | "reviews" | "whitespace" | "brands">("overview");
 
   const searchBrandPresence = async () => {
     if (!brandName.trim() || !coordinates) return;
