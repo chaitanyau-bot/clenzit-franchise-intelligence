@@ -2112,8 +2112,10 @@ function buildTerritoryModel({
 
   const modeledMinTerritoryHouseholds = Math.max(1_000, Math.round(minTerritoryHouseholds * radiusFactor));
   const modeledMaxTerritoryHouseholds = Math.max(modeledMinTerritoryHouseholds, Math.round(maxTerritoryHouseholds * radiusFactor));
-  const modeledMinEligibleHouseholds = Math.max(200, Math.round(minEligibleHouseholds * radiusFactor));
-  const modeledMaxEligibleHouseholds = Math.max(modeledMinEligibleHouseholds, Math.round(maxEligibleHouseholds * radiusFactor));
+  // The Clenzit commercial commitment remains 10K–12K eligible households;
+  // radius changes the recommended territory size, not the promised target.
+  const modeledMinEligibleHouseholds = minEligibleHouseholds;
+  const modeledMaxEligibleHouseholds = maxEligibleHouseholds;
 
   const householdCoveragePercent =
     Math.round(
