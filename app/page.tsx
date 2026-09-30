@@ -25,16 +25,31 @@ export default function Home() {
   const [analyzing, setAnalyzing] = useState(false);
   const [message, setMessage] = useState("");
 
- function analyzeArea() {
+ async function analyzeArea() {
   if (!location.trim()) {
     setMessage("Please enter a city or location.");
     return;
   }
 
-  const locationValue = encodeURIComponent(location.trim());
-  const radiusValue = encodeURIComponent(radius.replace(" km", ""));
-
-  window.location.href = `/analyze?location=${locationValue}&radius=${radiusValue}`;
+    setAnalyzing(true);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/geocode?location=${encodeURIComponent(location.trim())}`);
+      const data = await response.json();
+      if (!response.ok || !Number.isFinite(Number(data.latitude)) || !Number.isFinite(Number(data.longitude))) {
+        throw new Error(data?.error || "We could not find that landmark or business.");
+      }
+      const params = new URLSearchParams({
+        location: data.location || location.trim(),
+        radius: radius.replace(" km", ""),
+        latitude: String(data.latitude),
+        longitude: String(data.longitude),
+      });
+      window.location.href = `/analyze?${params.toString()}`;
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "We could not find that location.");
+      setAnalyzing(false);
+    }
 }
   
 
@@ -88,7 +103,7 @@ export default function Home() {
           <div className="mb-6">
             <h3 className="text-xl font-bold">Area Analyzer</h3>
             <p className="mt-1 text-sm text-slate-500">
-              Enter a location to begin a franchise potential analysis.
+              Enter a landmark, business, hotel, building, or locality to define the centre of the catchment.
             </p>
           </div>
 
@@ -105,7 +120,7 @@ export default function Home() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") analyzeArea();
                 }}
-                placeholder="e.g. Karjat, Maharashtra"
+                placeholder="e.g. Phoenix Marketcity, Pune or Tumbledry Wardha"
                 className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-sm outline-none transition focus:border-[#c4912e] focus:ring-2 focus:ring-[#c4912e]/10"
               />
             </div>
