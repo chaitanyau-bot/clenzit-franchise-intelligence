@@ -62,6 +62,11 @@ const CATEGORIES = [
     query: "business offices companies",
   },
   {
+    key: "apartments",
+    label: "Apartments & Housing Societies",
+    query: "apartment complexes housing societies gated communities residential societies",
+  },
+  {
     key: "boutiques",
     label: "Boutiques & Fashion",
     query: "boutiques clothing fashion stores",

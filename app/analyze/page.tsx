@@ -1648,6 +1648,12 @@ function AnalyzeContent() {
                                           </span>
                                         )}
 
+                                        {distanceKm(business.latitude, business.longitude) != null && (
+                                          <span className="font-semibold text-[#10264b]">
+                                            {distanceKm(business.latitude, business.longitude)!.toFixed(1)} km away
+                                          </span>
+                                        )}
+
                                       </div>
 
                                     </div>
@@ -1750,6 +1756,29 @@ function AnalyzeContent() {
             />
 
           </div>
+
+          {(() => {
+            const apartments = placesData?.categories.find((category) => category.key === "apartments")?.businesses || [];
+            return apartments.length > 0 ? (
+              <div className="mt-8 rounded-xl border border-[#e4c477] bg-[#fff9e9] p-5">
+                <h3 className="text-lg font-bold text-[#10264b]">Apartments & large housing societies</h3>
+                <p className="mt-1 text-sm text-slate-600">Google-listed residential communities in the selected catchment, sorted as practical outreach prospects.</p>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {apartments.slice(0, 10).map((business, index) => {
+                    const distance = distanceKm(business.latitude, business.longitude);
+                    return <div key={business.id || `${business.name}-${index}`} className="rounded-lg border border-slate-200 bg-white p-3 text-sm">
+                      <p className="font-bold text-[#10264b]">{business.name}</p>
+                      <p className="mt-1 text-slate-600">{business.address}</p>
+                      <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
+                        {distance != null && <span className="font-semibold text-[#10264b]">{distance.toFixed(1)} km from selected location</span>}
+                        {business.rating != null && <span>★ {business.rating.toFixed(1)} · {(business.reviews || 0).toLocaleString()} reviews</span>}
+                      </div>
+                    </div>;
+                  })}
+                </div>
+              </div>
+            ) : null;
+          })()}
 
         </section>
 
