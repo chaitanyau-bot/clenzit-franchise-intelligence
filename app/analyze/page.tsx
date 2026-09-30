@@ -1410,7 +1410,7 @@ function AnalyzeContent() {
               )}–${formatCompact(
                 territoryModel.maxTerritoryHouseholds
               )}`}
-              subtitle="households"
+              subtitle={`modeled households · ${radiusKm} km catchment`}
             />
 
             <InfoCard
@@ -1420,7 +1420,7 @@ function AnalyzeContent() {
               )}–${formatCompact(
                 territoryModel.maxEligibleHouseholds
               )}`}
-              subtitle="Clenzit opportunity"
+              subtitle={`modeled opportunity · ${radiusKm} km catchment`}
             />
 
             <InfoCard
@@ -2058,12 +2058,9 @@ function buildTerritoryModel({
    * household/population data.
    */
 
-  const radiusFactor =
-    clamp(
-      radiusKm / 5,
-      0.5,
-      2
-    );
+  // Catchment opportunity scales with area (radius squared), so different
+  // search radii produce different modeled figures.
+  const radiusFactor = clamp((radiusKm / 5) ** 2, 0.04, 1);
 
   const midpoint =
     (
@@ -2078,19 +2075,17 @@ function buildTerritoryModel({
         radiusFactor
     );
 
-  estimatedTerritoryHouseholds =
-    clamp(
-      estimatedTerritoryHouseholds,
-      minTerritoryHouseholds,
-      maxTerritoryHouseholds
-    );
+  const modeledMinTerritoryHouseholds = Math.max(1_000, Math.round(minTerritoryHouseholds * radiusFactor));
+  const modeledMaxTerritoryHouseholds = Math.max(modeledMinTerritoryHouseholds, Math.round(maxTerritoryHouseholds * radiusFactor));
+  const modeledMinEligibleHouseholds = Math.max(200, Math.round(minEligibleHouseholds * radiusFactor));
+  const modeledMaxEligibleHouseholds = Math.max(modeledMinEligibleHouseholds, Math.round(maxEligibleHouseholds * radiusFactor));
 
   const householdCoveragePercent =
     Math.round(
       (
         (
-          minEligibleHouseholds +
-          maxEligibleHouseholds
+          modeledMinEligibleHouseholds +
+          modeledMaxEligibleHouseholds
         ) /
         2 /
         estimatedTerritoryHouseholds
@@ -2113,10 +2108,8 @@ function buildTerritoryModel({
    */
 
   if (
-    estimatedTerritoryHouseholds >=
-      minTerritoryHouseholds &&
-    estimatedTerritoryHouseholds <=
-      maxTerritoryHouseholds
+    estimatedTerritoryHouseholds >= modeledMinTerritoryHouseholds &&
+    estimatedTerritoryHouseholds <= modeledMaxTerritoryHouseholds
   ) {
     territoryFit = "STRONG";
   }
@@ -2131,11 +2124,11 @@ function buildTerritoryModel({
     tier,
     tierLabel,
 
-    minTerritoryHouseholds,
-    maxTerritoryHouseholds,
+    minTerritoryHouseholds: modeledMinTerritoryHouseholds,
+    maxTerritoryHouseholds: modeledMaxTerritoryHouseholds,
 
-    minEligibleHouseholds,
-    maxEligibleHouseholds,
+    minEligibleHouseholds: modeledMinEligibleHouseholds,
+    maxEligibleHouseholds: modeledMaxEligibleHouseholds,
 
     estimatedTerritoryHouseholds,
 
