@@ -1352,6 +1352,36 @@ function AnalyzeContent() {
               <p className="mt-1 text-sm text-amber-900">
                 Only Google-returned review excerpts rated 3 stars or below are shown as negative-review opportunities. The panel never invents review comments.
               </p>
+              {(() => {
+                const reviews = (placesData?.categories || [])
+                  .flatMap((category) => category.businesses || [])
+                  .flatMap((business) => business.reviewExcerpts || [])
+                  .filter((review) => typeof review.text === "string");
+                const themes = [
+                  { match: /deliver|delivery|late|delay|turnaround|tat/i, title: "Make delivery TAT a promise", action: "Communicate a clear pickup and delivery timeline, with proactive delay updates." },
+                  { match: /staff|behavio|rude|professional|attitude/i, title: "Make staff presentation a daily standard", action: "Keep customer-facing staff neat, tidy, polite, and professionally presented." },
+                  { match: /quality|clean|stain|damage|wash/i, title: "Protect service quality", action: "Use quality checks and garment-care controls before every order is returned." },
+                  { match: /price|cost|charge|expensive|bill/i, title: "Show pricing before acceptance", action: "Give transparent estimates and explain any additional charges upfront." },
+                  { match: /response|respond|phone|call|whatsapp|contact/i, title: "Respond quickly on every channel", action: "Set a response standard for calls, WhatsApp enquiries, and order updates." },
+                  { match: /packag|mix|lost|missing|return/i, title: "Strengthen order handover", action: "Use labelled packaging and a final checklist to prevent mix-ups or missing items." },
+                ];
+                return (
+                  <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                    <h4 className="font-bold text-[#10264b]">Recommended operating advantages</h4>
+                    <p className="mt-1 text-xs text-emerald-900">Recommendations are generated from recurring themes in the available Google review excerpts.</p>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      {themes.map((theme) => {
+                        const count = reviews.filter((review) => theme.match.test(review.text)).length;
+                        return <div key={theme.title} className="rounded-lg border border-emerald-100 bg-white p-3 text-sm">
+                          <p className="font-semibold text-[#10264b]">{theme.title}</p>
+                          <p className="mt-1 text-slate-600">{theme.action}</p>
+                          <p className="mt-2 text-xs font-semibold text-emerald-700">{count} supporting review excerpt{count === 1 ? "" : "s"}</p>
+                        </div>;
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="mt-4 grid gap-3 md:grid-cols-3">
                 {((placesData?.categories || []).find((c) => c.key === "laundry")?.businesses || [])
                   .filter((b) =>
