@@ -1327,6 +1327,7 @@ function AnalyzeContent() {
           <div className="flex flex-wrap gap-2">
             {[
               ["overview", "Overview"],
+              ["test", "Test Presentation"],
               ["reviews", "Reviews & Opportunity"],
               ["whitespace", "White-space Map"],
               ["brands", "Brand Footprint"],
@@ -1372,6 +1373,20 @@ function AnalyzeContent() {
                       ))}
                     </div>
                   ))}
+              </div>
+            </div>
+          )}
+
+          {activeInsight === "test" && (
+            <div className="mt-3 rounded-xl bg-[#fff9e9] p-5">
+              <h3 className="font-bold text-[#10264b]">Prospect presentation test</h3>
+              <p className="mt-1 text-sm text-slate-700">
+                Use the evidence panel above while presenting this territory. It shows live nearby listings, residential communities, commercial prospects, the selected radius, and the source of each planning assumption.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <InsightMetric label="Selected catchment" value={`${radiusKm} km`} />
+                <InsightMetric label="Household target" value="10K–12K" />
+                <InsightMetric label="Data freshness" value="Live lookup" />
               </div>
             </div>
           )}
