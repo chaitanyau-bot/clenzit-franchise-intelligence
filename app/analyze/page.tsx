@@ -1299,6 +1299,26 @@ function AnalyzeContent() {
 
         </section>
 
+        <section className="mb-8 rounded-2xl border border-[#e4c477] bg-[#fff9e9] p-6 shadow-sm">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#b07a16]">Opportunity evidence</p>
+              <h3 className="mt-2 text-2xl font-bold text-[#10264b]">Why this territory is worth evaluating</h3>
+              <p className="mt-1 max-w-3xl text-sm text-slate-600">
+                A live snapshot of nearby demand and competition for the selected {radiusKm} km catchment. Figures are sourced from Google Places and clearly marked when estimated.
+              </p>
+            </div>
+            <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-800">LIVE MARKET SNAPSHOT</span>
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <InsightMetric label="Eligible household target" value="10K–12K" />
+            <InsightMetric label="Residential communities" value={String((placesData?.categories.find((c) => c.key === "apartments")?.count || 0))} />
+            <InsightMetric label="Nearby commercial prospects" value={String((placesData?.categories || []).filter((c) => !["apartments", "laundry", "carDealers"].includes(c.key)).reduce((total, c) => total + c.count, 0))} />
+            <InsightMetric label="Direct laundry listings" value={analysis.laundryIsCapped ? "20+" : String(analysis.laundry)} />
+          </div>
+          <p className="mt-4 text-xs text-slate-500">Source: live Google Business Profiles · Catchment: {radiusKm} km · Household target: Clenzit planning assumption</p>
+        </section>
+
         {/* =================================================
             INNOVATION TABS
             ================================================= */}
